@@ -7,8 +7,8 @@ import subprocess
 
 # Helper function to convert WebKit timestamp to human-readable format
 def convert_time(timestamp):
-    epoch_start = 11644473600000000  # WebKit epoch start
-    return datetime.fromtimestamp((timestamp - epoch_start) / 1000000)  # Convert microseconds to seconds
+    epoch_start = 978307200  # Safari epoch start (January 1, 2001)
+    return datetime.fromtimestamp(timestamp + epoch_start)  # Convert seconds to human-readable format
 
 # Function to kill browser processes
 def kill_browsers():
@@ -19,7 +19,10 @@ def kill_browsers():
 
 # Function to extract Chrome history on macOS
 def extract_chrome_history():
+    #Managed Chrome will have a Profile folder, rather than the default - this should be "Profile 1" on non hotdesk machines. 
+    #db_path = os.path.expanduser('~/Library/Application Support/Google/Chrome/Profile 1/History')
     db_path = os.path.expanduser('~/Library/Application Support/Google/Chrome/Default/History')
+    print(f"Chrome history database path: {db_path}")
     if not os.path.exists(db_path):
         print("Chrome history database not found.")
         return
@@ -44,6 +47,7 @@ def extract_chrome_history():
 # Function to extract Firefox history on macOS
 def extract_firefox_history():
     profile_path = os.path.expanduser('~/Library/Application Support/Firefox/Profiles')
+    print(f"Firefox profiles path: {profile_path}")
     if not os.path.exists(profile_path):
         print("Firefox profiles not found.")
         return
@@ -51,6 +55,7 @@ def extract_firefox_history():
         for file in files:
             if file == 'places.sqlite':
                 db_path = os.path.join(root, file)
+                print(f"Firefox history database path: {db_path}")
                 try:
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
@@ -73,20 +78,21 @@ def extract_firefox_history():
 # Function to extract Safari history on macOS
 def extract_safari_history():
     db_path = os.path.expanduser('~/Library/Safari/History.db')
+    print(f"Safari history database path: {db_path}")
     if not os.path.exists(db_path):
         print("Safari history database not found.")
         return
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT url, title, visit_time FROM history_items")
+        cursor.execute("SELECT url, visit_time FROM history_visits JOIN history_items ON history_visits.history_item = history_items.id")
         rows = cursor.fetchall()
         with open('safari_history.csv', 'w', newline='', encoding='utf-8') as csvfile:
             csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(['URL', 'Title', 'Visit Time'])
+            csvwriter.writerow(['URL', 'Visit Time'])
             for row in rows:
                 row = list(row)
-                row[2] = datetime.fromtimestamp(row[2] + 978307200)  # Safari epoch is Jan 1, 2001
+                row[1] = convert_time(row[1])
                 csvwriter.writerow(row)
         conn.close()
         print("Safari history saved to safari_history.csv")
